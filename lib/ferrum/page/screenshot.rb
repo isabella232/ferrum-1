@@ -19,6 +19,13 @@ module Ferrum
         save_file(path, data)
       end
 
+      def window_size
+        evaluate <<~JS
+          [document.documentElement.clientWidth,
+           document.documentElement.clientHeight]
+        JS
+      end
+
       private
 
       def save_file(path, data)
@@ -66,7 +73,7 @@ module Ferrum
 
         if scale != 1.0
           if !options[:clip]
-            width, height = evaluate("[document.documentElement.clientWidth, document.documentElement.clientHeight]")
+            width, height = window_size
             options[:clip] = { x: 0, y: 0, width: width, height: height }
           end
 

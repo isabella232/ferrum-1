@@ -324,7 +324,7 @@ module Ferrum
 
       sleep 0.1
 
-      expect(browser.window_handles.size).to eq(2)
+      expect(browser.targets.size).to eq(2)
 
       browser.execute <<~JS
         window.open("/ferrum/simple", "popup2")
@@ -332,62 +332,58 @@ module Ferrum
 
       sleep 0.1
 
-      expect(browser.window_handles.size).to eq(3)
+      expect(browser.targets.size).to eq(3)
 
-      popup2 = browser.window_handles.last
-
-      browser.within_window(popup2) do
-        expect(browser.body).to include("Test")
-        # Browser isn't dead, current page after executing JS closes connection
-        # and we don't have a chance to push response to the Queue. Since the
-        # queue and websocket are closed and response is nil the proper guess
-        # would be that browser is dead, but in fact the page is dead and
-        # browser is fully alive.
-        browser.execute("window.close()") rescue Ferrum::DeadBrowserError
-      end
+      popup2 = browser.last_window
+      expect(popup2.body).to include("Test")
+      # Browser isn't dead, current page after executing JS closes connection
+      # and we don't have a chance to push response to the Queue. Since the
+      # queue and websocket are closed and response is nil the proper guess
+      # would be that browser is dead, but in fact the page is dead and
+      # browser is fully alive.
+      popup2.execute("window.close()") rescue Ferrum::DeadBrowserError
 
       sleep 0.1
 
-      expect(browser.window_handles.size).to eq(2)
+      expect(browser.targets.size).to eq(2)
     end
 
     context "a new window inherits settings" do
       it "inherits size" do
         browser.goto
         browser.resize(width: 1200, height: 800)
-        new_window = browser.open_new_window
-        browser.switch_to_window(new_window)
-        expect(browser.window_size).to eq [1200, 800]
+        page = browser.create_page
+        expect(page.window_size).to eq [1200, 800]
       end
     end
 
-    # it "resizes windows" do
-    #   browser.goto
-    #
-    #   expect(browser.window_handles.size).to eq(1)
-    #   main = browser.window_handles.first
-    #
-    #   browser.execute <<-JS
-    #     window.open("/ferrum/simple", "popup1")
-    #   JS
-    #   popup1 = browser.window_handles.last
-    #
-    #   browser.execute <<-JS
-    #     window.open("/ferrum/simple", "popup2")
-    #   JS
-    #   popup2 = browser.window_handles.last
-    #
-    #   browser.switch_to_window(popup1)
-    #   browser.resize(width: 100, height: 200)
-    #   browser.switch_to_window(popup2)
-    #   browser.resize(width: 200, height: 100)
-    #
-    #   browser.switch_to_window(popup1)
-    #   expect(browser.window_size).to eq([100, 200])
-    #
-    #   browser.switch_to_window(popup2)
-    #   expect(browser.window_size).to eq([200, 100])
-    # end
+    it "resizes windows", skip: true do
+      browser.goto
+
+      expect(browseir.targets.size).to eq(1)
+      main = browser.targets.first
+
+      browser.execute <<-JS
+        window.open("/ferrum/simple", "popup1")
+      JS
+      popup1 = browser.targets.last
+
+      browser.execute <<-JS
+        window.open("/ferrum/simple", "popup2")
+      JS
+      popup2 = browser.targets.last
+
+      browser.switch_to_window(popup1)
+      browser.resize(width: 100, height: 200)
+      browser.switch_to_window(popup2)
+      browser.resize(width: 200, height: 100)
+
+      browser.switch_to_window(popup1)
+      expect(browser.window_size).to eq([100, 200])
+
+      browser.switch_to_window(popup2)
+      expect(browser.window_size).to eq([200, 100])
+    end
 
     it "clears local storage after reset" do
       browser.goto
@@ -565,45 +561,38 @@ module Ferrum
       end
     end
 
-    context "window switching support", skip: true do
+    context "window switching support" do
       it "waits for the window to load" do
         browser.goto
 
-        popup = browser.window_opened_by do
-          browser.execute <<-JS
-            window.open("/ferrum/slow", "popup")
-          JS
-        end
+        browser.execute <<-JS
+          window.open("/ferrum/slow", "popup")
+        JS
 
-        browser.within_window(popup) do
-          expect(browser.html).to include("slow page")
-        end
+        popup = browser.last_window
+        expect(popup.body).to include("slow page")
         popup.close
       end
 
       it "can access a second window of the same name" do
         browser.goto
 
-        popup = browser.window_opened_by do
-          browser.execute <<-JS
-            window.open("/ferrum/simple", "popup")
-          JS
-        end
-        browser.within_window(popup) do
-          expect(browser.html).to include("Test")
-        end
+        browser.execute <<-JS
+          window.open("/ferrum/simple", "popup")
+        JS
+
+        popup = browser.last_window
+        expect(popup.body).to include("Test")
         popup.close
 
         sleep 0.5 # https://github.com/ChromeDevTools/devtools-protocol/issues/145
 
-        same = browser.window_opened_by do
-          browser.execute <<-JS
-            window.open("/ferrum/simple", "popup")
-          JS
-        end
-        browser.within_window(same) do
-          expect(browser.html).to include("Test")
-        end
+        browser.execute <<-JS
+          window.open("/ferrum/simple", "popup")
+        JS
+
+        same = browser.last_window
+        expect(same.body).to include("Test")
         same.close
       end
     end
